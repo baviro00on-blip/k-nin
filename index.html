@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>けいさんにんじゃWT</title>
+    <title>けいさんにんじゃワールドツアー</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800;900&family=Zen+Maru+Gothic:wght@700;900&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -204,12 +204,12 @@
             <header class="flex items-center justify-between pb-1.5 border-b border-slate-800 gap-1">
                 <div class="flex items-center gap-1.5">
                     <span class="text-amber-400 font-black text-xs sm:text-sm tracking-wider whitespace-nowrap">
-                        けいさんにんじゃWT
+                        けいさんにんじゃワールドツアー
                     </span>
                 </div>
                 <div class="flex items-center gap-1.5">
                     <button id="openAlbumBtn" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded-xl text-xs font-black tracking-wider shadow transition flex items-center gap-1 cursor-pointer border border-indigo-400/40 whitespace-nowrap">
-                        🃏 図鑑 (<span id="cardCountBadge">0</span>/60)
+                        🃏 ずかん (<span id="cardCountBadge">0</span>/60)
                     </button>
                     <button id="soundToggle" class="text-xs bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold px-2.5 py-1 rounded-full border border-amber-500/50 transition flex items-center gap-1 cursor-pointer">
                         🔊 ON
@@ -414,7 +414,7 @@
 
             <!-- Footer -->
             <footer class="text-center text-[11px] text-slate-500 pt-2 border-t border-slate-800 flex justify-between items-center px-1">
-                <span>けいさんにんじゃワールドしゅぎょう</span>
+                <span>けいさんにんじゃワールドツアー</span>
                 <span id="clearedCountText" class="text-amber-400 font-bold">クリア: 0 / 28</span>
             </footer>
         </div>
@@ -1364,6 +1364,28 @@
             const worldSubtext = document.getElementById('worldSubtext');
             const worldIconText = document.getElementById('worldIconText');
 
+            let allStagesInOrder = [];
+            WORLDS.forEach(w => allStagesInOrder.push(...w.stages));
+
+            // World unlock check: Unlocked if it is World 1 or if the world's first stage is unlocked
+            const isWorldUnlocked = (wId) => {
+                const targetWorld = WORLDS.find(w => w.id === wId);
+                if (!targetWorld) return false;
+                const firstStage = targetWorld.stages[0];
+                const idx = allStagesInOrder.findIndex(s => s.id === firstStage.id);
+                return idx === 0 || clearedStages.includes(allStagesInOrder[idx - 1].id);
+            };
+
+            // If current selected world is locked, fallback to the highest unlocked world
+            if (!isWorldUnlocked(currentWorldId)) {
+                for (let i = WORLDS.length - 1; i >= 0; i--) {
+                    if (isWorldUnlocked(WORLDS[i].id)) {
+                        currentWorldId = WORLDS[i].id;
+                        break;
+                    }
+                }
+            }
+
             const world = WORLDS.find(w => w.id === currentWorldId) || WORLDS[0];
 
             if (worldTabs) {
@@ -1371,16 +1393,27 @@
                 WORLDS.forEach(w => {
                     const btn = document.createElement('button');
                     const isActive = w.id === currentWorldId;
-                    btn.className = `px-1 py-1.5 rounded-xl font-black text-[11px] sm:text-xs transition cursor-pointer flex items-center justify-center gap-0.5 ${
-                        isActive 
-                            ? 'bg-amber-400 text-slate-950 border-2 border-white shadow-lg scale-105 z-10' 
-                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
-                    }`;
-                    btn.innerHTML = `<span class="text-xs sm:text-sm">${w.icon}</span><span>W${w.id}</span>`;
-                    btn.onclick = () => {
-                        currentWorldId = w.id;
-                        renderWorldSelect();
-                    };
+                    const unlocked = isWorldUnlocked(w.id);
+
+                    if (unlocked) {
+                        btn.className = `px-1 py-1.5 rounded-xl font-black text-[11px] sm:text-xs transition cursor-pointer flex items-center justify-center gap-0.5 ${
+                            isActive 
+                                ? 'bg-amber-400 text-slate-950 border-2 border-white shadow-lg scale-105 z-10' 
+                                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+                        }`;
+                        btn.innerHTML = `<span class="text-xs sm:text-sm">${w.icon}</span><span>W${w.id}</span>`;
+                        btn.onclick = () => {
+                            currentWorldId = w.id;
+                            renderWorldSelect();
+                        };
+                    } else {
+                        btn.className = `px-1 py-1.5 rounded-xl font-black text-[11px] sm:text-xs transition cursor-not-allowed flex items-center justify-center gap-0.5 bg-slate-950 text-slate-600 border border-slate-800/80 opacity-50`;
+                        btn.innerHTML = `<span class="text-xs">🔒</span><span>W${w.id}</span>`;
+                        btn.onclick = () => {
+                            sound.playWrong();
+                        };
+                    }
+
                     worldTabs.appendChild(btn);
                 });
             }
@@ -1391,9 +1424,6 @@
 
             if (stagesGrid) {
                 stagesGrid.innerHTML = '';
-
-                let allStagesInOrder = [];
-                WORLDS.forEach(w => allStagesInOrder.push(...w.stages));
 
                 world.stages.forEach(stg => {
                     const idx = allStagesInOrder.findIndex(s => s.id === stg.id);
@@ -1633,7 +1663,11 @@
                 if (nextUnlockMessage) nextUnlockMessage.textContent = `次のステージ「${nextStg.name}」が 解放された！`;
                 if (nextStageBtn) {
                     nextStageBtn.style.display = 'block';
-                    nextStageBtn.onclick = () => startStage(nextStg);
+                    nextStageBtn.onclick = () => {
+                        const nextWorld = WORLDS.find(w => w.stages.some(s => s.id === nextStg.id));
+                        if (nextWorld) currentWorldId = nextWorld.id;
+                        startStage(nextStg);
+                    };
                 }
             } else {
                 if (nextUnlockMessage) nextUnlockMessage.textContent = `🎉 全てのワールドを制覇！君こそ真のけいさんにんじゃマスターだ！`;
@@ -1764,6 +1798,18 @@
 
         document.getElementById('mapFromVictoryBtn').addEventListener('click', () => {
             hideAllScreens();
+            let allStages = [];
+            WORLDS.forEach(w => allStages.push(...w.stages));
+            if (currentStage) {
+                const idx = allStages.findIndex(s => s.id === currentStage.id);
+                if (idx >= 0 && idx < allStages.length - 1) {
+                    const nextStg = allStages[idx + 1];
+                    const nextWorld = WORLDS.find(w => w.stages.some(s => s.id === nextStg.id));
+                    if (nextWorld && nextWorld.id !== currentWorldId) {
+                        currentWorldId = nextWorld.id;
+                    }
+                }
+            }
             document.getElementById('worldSelectScreen').classList.remove('hidden');
             renderWorldSelect();
         });
